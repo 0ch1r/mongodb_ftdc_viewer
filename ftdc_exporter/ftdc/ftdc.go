@@ -2,6 +2,7 @@ package ftdc
 
 import (
 	"context"
+	"strings"
 )
 
 // StreamBatches is a public wrapper to stream ftdc metrics
@@ -23,11 +24,41 @@ func GetTags(ctx context.Context, path string) (map[string]string, error) {
 		return map[string]string{}, ErrInvalidFormat
 	}
 
-	hostname := metadata["doc"].(map[string]interface{})["hostInfo"].(map[string]interface{})["system"].(map[string]interface{})["hostname"].(string)
-	version := metadata["doc"].(map[string]interface{})["buildInfo"].(map[string]interface{})["version"].(string)
+	hostname := getNestedString(metadata, "doc.hostInfo.system.hostname")
 
+	if hostname == "" {
+		hostname = getNestedString(metadata, "doc.common.hostInfo.system.hostname")
+	}
+	version := getNestedString(metadata, "doc.buildInfo.version")
+
+	if version == "" {
+		version = getNestedString(metadata, "doc.common.buildInfo.version")
+
+	}
 	return map[string]string{
 		"hostname": hostname,
 		"version":  version,
 	}, nil
+}
+
+func getNestedString(m map[string]interface{}, path string) string {
+	keys := strings.Split(path, ".")
+	var curr interface{} = m
+
+	for _, k := range keys {
+		next, ok := curr.(map[string]interface{})
+		if !ok {
+			return ""
+		}
+		curr, ok = next[k]
+		if !ok {
+			return ""
+		}
+	}
+
+	val, ok := curr.(string)
+	if !ok {
+		return ""
+	}
+	return val
 }

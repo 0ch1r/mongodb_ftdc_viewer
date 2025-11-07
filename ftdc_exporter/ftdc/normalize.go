@@ -67,6 +67,9 @@ func normalizeDocument(document *birch.Document, includedPatterns map[string]str
 	for iter.Next() {
 		elem := iter.Element()
 		key := elem.Key()
+		// on some versions, the metrics are starting with a common. prefix
+		// I decided to get rid of it so that we do not have to change anything in the grafana dashboards.
+		key = strings.TrimPrefix(key, "common.")
 		val := elem.Value()
 		if isIncluded(key, includedPatterns) {
 			normalized[key] = normalizeValue(val, includedPatterns)
