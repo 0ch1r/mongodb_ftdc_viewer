@@ -4,14 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/yourusername/my-ftdc-tool/ftdc"
-	"github.com/yourusername/my-ftdc-tool/internal/config"
-	"github.com/yourusername/my-ftdc-tool/internal/influx"
-	"github.com/yourusername/my-ftdc-tool/internal/logging"
-	"golang.org/x/sync/errgroup"
 	"io"
 	"io/fs"
 	"log"
+	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -19,42 +15,78 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/yourusername/my-ftdc-tool/ftdc"
+	"github.com/yourusername/my-ftdc-tool/internal/config"
+	"github.com/yourusername/my-ftdc-tool/internal/logging"
+	"github.com/yourusername/my-ftdc-tool/internal/storage"
+	"golang.org/x/sync/errgroup"
 )
 
-func buildGrafanaURL(ctx context.Context, cfg *config.Config) (error, string) {
-	client := influx.NewClient(ctx, influx.Config{
-		Org:         cfg.InfluxOrg,
-		Bucket:      cfg.InfluxBucket,
-		Url:         cfg.InfluxURL,
-		Token:       cfg.InfluxToken,
-		UseGzip:     cfg.InfluxUseGZip,
-		Measurement: cfg.InfluxMeasurement,
-	})
-	defer client.Close()
-	err, earliest := client.FetchEarliestTimestamp()
-	if err != nil {
-		return err, ""
-	}
+const (
+	grafanaDateFormat   = "2006-01-02T15:04:05.000Z"
+	grafanaDashboardURL = "http://localhost:3001/d/ddnw277huiv40ae/ftdc-dashboard"
+)
 
-	err, latest := client.FetchLatestTimestamp()
-	if err != nil {
-		return err, ""
-	}
-	baseURL := "http://localhost:3001/d/ddnw277huiv40ae/ftdc-dashboard"
-	return nil, fmt.Sprintf("%s?from=%s&to=%s&timezone=UTC", baseURL, earliest, latest)
+type timeBounds struct {
+	min atomic.Int64
+	max atomic.Int64
 }
 
-func ingestFTDCFromFile(absInputPath string, cfg *config.Config, counter *atomic.Int64) error {
+func newTimeBounds() *timeBounds {
+	tb := &timeBounds{}
+	tb.min.Store(math.MaxInt64)
+	tb.max.Store(math.MinInt64)
+	return tb
+}
+
+func (tb *timeBounds) observe(ts int64) {
+	for {
+		current := tb.min.Load()
+		if ts >= current {
+			break
+		}
+		if tb.min.CompareAndSwap(current, ts) {
+			break
+		}
+	}
+	for {
+		current := tb.max.Load()
+		if ts <= current {
+			break
+		}
+		if tb.max.CompareAndSwap(current, ts) {
+			break
+		}
+	}
+}
+
+func (tb *timeBounds) rangeMillis() (int64, int64, bool) {
+	min := tb.min.Load()
+	max := tb.max.Load()
+	if min == math.MaxInt64 || max == math.MinInt64 || max < min {
+		return 0, 0, false
+	}
+	return min, max, true
+}
+
+func buildGrafanaURL(bounds *timeBounds) (string, error) {
+	start, end, ok := bounds.rangeMillis()
+	if !ok {
+		return "", fmt.Errorf("no FTDC metrics were ingested; cannot build dashboard link")
+	}
+	from := time.UnixMilli(start).UTC().Format(grafanaDateFormat)
+	to := time.UnixMilli(end).UTC().Format(grafanaDateFormat)
+	return fmt.Sprintf("%s?from=%s&to=%s&timezone=UTC", grafanaDashboardURL, from, to), nil
+}
+
+func ingestFTDCFromFile(absInputPath string, cfg *config.Config, counter *atomic.Int64, bounds *timeBounds) error {
 	ctx := context.Background()
-	client := influx.NewClient(ctx, influx.Config{
-		Org:         cfg.InfluxOrg,
-		Bucket:      cfg.InfluxBucket,
-		Url:         cfg.InfluxURL,
-		Token:       cfg.InfluxToken,
-		UseGzip:     cfg.InfluxUseGZip,
-		Measurement: cfg.InfluxMeasurement,
-	})
-	defer client.Close()
+	writer, err := storage.NewWriter(ctx, cfg.StorageOptions())
+	if err != nil {
+		return err
+	}
+	defer writer.Close()
 
 	tags, err := ftdc.GetTags(ctx, absInputPath)
 	if err != nil {
@@ -62,27 +94,30 @@ func ingestFTDCFromFile(absInputPath string, cfg *config.Config, counter *atomic
 	}
 
 	batches, errs := ftdc.StreamBatches(ctx, absInputPath, cfg.MetricsIncludeFile, cfg.BatchSize, cfg.BatchBuffer)
-	total := 0
 	if cfg.Debug {
 		logging.Info("Processing: %s", absInputPath)
 	}
 	for batch := range batches {
-		var points []*influx.Point
+		points := make([]storage.Point, 0, len(batch.Items))
 		for _, doc := range batch.Items {
-			t := time.UnixMilli(doc["start"].(int64))
-			points = append(points, client.NewPoint(tags, doc, t))
+			tsMillis, err := extractTimestamp(doc["start"])
+			if err != nil {
+				return err
+			}
+			points = append(points, storage.Point{
+				Fields:    doc,
+				Timestamp: time.UnixMilli(tsMillis),
+			})
+			bounds.observe(tsMillis)
 		}
 
-		if err := client.WritePoint(points...); err != nil {
+		if err := writer.Write(ctx, tags, points); err != nil {
 			return err
 		}
 
-		total += len(batch.Items)
 		counter.Add(int64(len(batch.Items)))
-
 	}
 
-	// 5. check for stream errors
 	if err := <-errs; err != nil && err != io.EOF {
 		fmt.Println("stream error:", err)
 	}
@@ -92,10 +127,24 @@ func ingestFTDCFromFile(absInputPath string, cfg *config.Config, counter *atomic
 	return nil
 }
 
+func extractTimestamp(v interface{}) (int64, error) {
+	switch val := v.(type) {
+	case int64:
+		return val, nil
+	case int32:
+		return int64(val), nil
+	case float64:
+		return int64(val), nil
+	default:
+		return 0, fmt.Errorf("document missing start timestamp field")
+	}
+}
+
 func main() {
 	cfg := config.ParseFlags()
 
 	var processed atomic.Int64
+	bounds := newTimeBounds()
 
 	time.Sleep(5 * time.Second)
 
@@ -117,7 +166,6 @@ func main() {
 
 	logging.PrintBanner()
 	cfg.Print()
-	// Ensure output file path is absolute
 	absFTDCDirectory, err := filepath.Abs(cfg.InputDir)
 	if err != nil {
 		log.Fatalf("Failed to get absolute path of output file: %v", err)
@@ -138,25 +186,22 @@ func main() {
 
 	g, ctx := errgroup.WithContext(context.Background())
 	g.SetLimit(cfg.Parallel)
-	// sort files in ascending order
 	sort.Strings(files)
 
 	logging.Info("%d files queued for processing", len(files))
 	for _, f := range files {
-		// copy f as local
-		f := f
+		file := f
 		g.Go(func() error {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
 			default:
-				if err := ingestFTDCFromFile(filepath.Clean(f), cfg, &processed); err != nil {
+				if err := ingestFTDCFromFile(filepath.Clean(file), cfg, &processed, bounds); err != nil {
 					if errors.Is(err, ftdc.ErrInvalidFormat) {
-						logging.Info("failed to ingest file %s: %v", f, err)
+						logging.Info("failed to ingest file %s: %v", file, err)
 						return nil
-					} else {
-						return err
 					}
+					return err
 				}
 			}
 			return nil
@@ -167,15 +212,14 @@ func main() {
 		fmt.Println("failed:", err)
 	}
 
-	// stop the periodic log updates
 	close(done)
 
-	err, grafanaUrl := buildGrafanaURL(ctx, cfg)
+	url, err := buildGrafanaURL(bounds)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	logging.Info("Metrics available for analysis on:\n\n %s\n", grafanaUrl)
+	logging.Info("Metrics available for analysis on:\n\n %s\n", url)
 	if cfg.WaitForever {
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()

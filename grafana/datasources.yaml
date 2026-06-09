@@ -1,14 +1,14 @@
 apiVersion: 1
 
 datasources:
-  - name: influxdb
-    type: influxdb
+  - name: victoriametrics
+    uid: victoriametrics
+    type: prometheus
     access: proxy
-    url: http://influxdb:8086
+    url: http://victoriametrics:8428
+    isDefault: true
     jsonData:
-      version: Flux
-      organization: ${INFLUX_ORG}
-      defaultBucket: ${INFLUX_BUCKET}
-      tlsSkipVerify: true
-    secureJsonData:
-      token: ${INFLUX_API_TOKEN}
+      httpMethod: POST
+      prometheusType: Prometheus
+      prometheusVersion: 2.46.0
+      timeInterval: 5s
