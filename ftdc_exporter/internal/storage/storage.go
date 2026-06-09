@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 )
@@ -10,9 +9,8 @@ import (
 type Backend string
 
 const (
-	BackendInflux      Backend = "influx"
-	BackendVictoria    Backend = "victoriametrics"
-	defaultMeasurement         = "ftdc"
+	BackendVictoria Backend = "victoriametrics"
+	defaultMeasurement       = "ftdc"
 )
 
 type Point struct {
@@ -26,18 +24,8 @@ type Writer interface {
 }
 
 type Config struct {
-	Backend     Backend
 	Measurement string
-	Influx      InfluxConfig
 	Victoria    VictoriaConfig
-}
-
-type InfluxConfig struct {
-	Org     string
-	Bucket  string
-	URL     string
-	Token   string
-	UseGzip bool
 }
 
 type VictoriaConfig struct {
@@ -58,12 +46,6 @@ func (cfg Config) measurement() string {
 }
 
 func NewWriter(ctx context.Context, cfg Config) (Writer, error) {
-	switch cfg.Backend {
-	case BackendInflux:
-		return newInfluxWriter(ctx, cfg.measurement(), cfg.Influx)
-	case BackendVictoria:
-		return newVictoriaWriter(cfg.measurement(), cfg.Victoria)
-	default:
-		return nil, fmt.Errorf("unsupported storage backend: %s", cfg.Backend)
-	}
+	_ = ctx
+	return newVictoriaWriter(cfg.measurement(), cfg.Victoria)
 }

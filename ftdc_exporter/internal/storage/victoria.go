@@ -6,13 +6,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
-
-	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
-	lineprotocol "github.com/influxdata/line-protocol"
 )
 
 type victoriaWriter struct {
@@ -132,13 +132,123 @@ func (w *victoriaWriter) buildURL() string {
 }
 
 func pointToLine(measurement string, tags map[string]string, p Point) (string, error) {
-	point := influxdb2.NewPoint(measurement, tags, p.Fields, p.Timestamp)
-	var builder strings.Builder
-	encoder := lineprotocol.NewEncoder(&builder)
-	encoder.SetFieldSortOrder(lineprotocol.SortFields)
-	encoder.SetPrecision(time.Nanosecond)
-	if _, err := encoder.Encode(point); err != nil {
-		return "", err
+	if strings.TrimSpace(measurement) == "" {
+		return "", fmt.Errorf("measurement must be provided")
 	}
+	var builder strings.Builder
+	builder.WriteString(escapeMeasurement(measurement))
+
+	if len(tags) > 0 {
+		tagKeys := make([]string, 0, len(tags))
+		for key := range tags {
+			tagKeys = append(tagKeys, key)
+		}
+		sort.Strings(tagKeys)
+		for _, key := range tagKeys {
+			builder.WriteByte(',')
+			builder.WriteString(escapeTagComponent(key))
+			builder.WriteByte('=')
+			builder.WriteString(escapeTagComponent(tags[key]))
+		}
+	}
+
+	fieldKeys := make([]string, 0, len(p.Fields))
+	for key := range p.Fields {
+		fieldKeys = append(fieldKeys, key)
+	}
+	sort.Strings(fieldKeys)
+
+	fieldCount := 0
+	for _, key := range fieldKeys {
+		value, ok := toLineProtocolValue(p.Fields[key])
+		if !ok {
+			continue
+		}
+		if fieldCount == 0 {
+			builder.WriteByte(' ')
+		} else {
+			builder.WriteByte(',')
+		}
+		builder.WriteString(escapeFieldKey(key))
+		builder.WriteByte('=')
+		builder.WriteString(value)
+		fieldCount++
+	}
+
+	if fieldCount == 0 {
+		return "", fmt.Errorf("point has no encodable fields")
+	}
+
+	builder.WriteByte(' ')
+	builder.WriteString(strconv.FormatInt(p.Timestamp.UnixNano(), 10))
 	return builder.String(), nil
+}
+
+func toLineProtocolValue(v interface{}) (string, bool) {
+	switch value := v.(type) {
+	case int:
+		return strconv.FormatInt(int64(value), 10) + "i", true
+	case int8:
+		return strconv.FormatInt(int64(value), 10) + "i", true
+	case int16:
+		return strconv.FormatInt(int64(value), 10) + "i", true
+	case int32:
+		return strconv.FormatInt(int64(value), 10) + "i", true
+	case int64:
+		return strconv.FormatInt(value, 10) + "i", true
+	case uint:
+		return strconv.FormatUint(uint64(value), 10) + "u", true
+	case uint8:
+		return strconv.FormatUint(uint64(value), 10) + "u", true
+	case uint16:
+		return strconv.FormatUint(uint64(value), 10) + "u", true
+	case uint32:
+		return strconv.FormatUint(uint64(value), 10) + "u", true
+	case uint64:
+		return strconv.FormatUint(value, 10) + "u", true
+	case float32:
+		if math.IsNaN(float64(value)) || math.IsInf(float64(value), 0) {
+			return "", false
+		}
+		return strconv.FormatFloat(float64(value), 'f', -1, 64), true
+	case float64:
+		if math.IsNaN(value) || math.IsInf(value, 0) {
+			return "", false
+		}
+		return strconv.FormatFloat(value, 'f', -1, 64), true
+	case bool:
+		return strconv.FormatBool(value), true
+	case string:
+		return quoteFieldString(value), true
+	case fmt.Stringer:
+		return quoteFieldString(value.String()), true
+	case []byte:
+		return quoteFieldString(string(value)), true
+	default:
+		if v == nil {
+			return "", false
+		}
+		return quoteFieldString(fmt.Sprint(v)), true
+	}
+}
+
+func escapeMeasurement(value string) string {
+	replacer := strings.NewReplacer(",", "\\,", " ", "\\ ")
+	return replacer.Replace(value)
+}
+
+func escapeTagComponent(value string) string {
+	replacer := strings.NewReplacer(",", "\\,", " ", "\\ ", "=", "\\=")
+	return replacer.Replace(value)
+}
+
+func escapeFieldKey(value string) string {
+	replacer := strings.NewReplacer(",", "\\,", " ", "\\ ")
+	return replacer.Replace(value)
+}
+
+func quoteFieldString(value string) string {
+	escaped := strings.ReplaceAll(value, "\\", "\\\\")
+	escaped = strings.ReplaceAll(escaped, "\"", "\\\"")
+	return "\"" + escaped + "\""
 }

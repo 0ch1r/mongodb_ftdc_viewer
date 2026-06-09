@@ -6,26 +6,20 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/yourusername/my-ftdc-tool/internal/storage"
 )
 
 type Config struct {
 	InputDir           string
-	InfluxURL          string
-	InfluxToken        string
-	InfluxOrg          string
-	InfluxUseGZip      bool
-	InfluxBucket       string
+	Bucket             string
 	MetricsIncludeFile string
 	Parallel           int
 	BatchSize          int
 	BatchBuffer        int
 	Debug              bool
-	InfluxMeasurement  string
+	Measurement        string
 	WaitForever        bool
-	StorageBackend     string
 	VictoriaURL        string
 	VictoriaToken      string
 	VictoriaTenant     string
@@ -39,13 +33,8 @@ func ParseFlags() *Config {
 	cfg := &Config{}
 
 	flag.StringVar(&cfg.InputDir, "input-dir", "", "Path to the directory containing FTDC files (required)")
-	flag.StringVar(&cfg.StorageBackend, "storage-backend", "victoriametrics", "Metrics backend to use (victoriametrics|influx)")
-	flag.StringVar(&cfg.InfluxURL, "influx-url", "", "InfluxDB server URL (e.g., http://localhost:8086) (required for --storage-backend=influx)")
-	flag.BoolVar(&cfg.InfluxUseGZip, "influx-gzip", true, "InfluxDB client gzip compression flag")
-	flag.StringVar(&cfg.InfluxToken, "influx-token", "ftdc", "InfluxDB authentication token")
-	flag.StringVar(&cfg.InfluxOrg, "influx-org", "my-org", "InfluxDB organization")
-	flag.StringVar(&cfg.InfluxMeasurement, "influx-measurement", "ftdc", "InfluxDB measurement")
-	flag.StringVar(&cfg.InfluxBucket, "influx-bucket", "my-bucket", "InfluxDB bucket name")
+	flag.StringVar(&cfg.Bucket, "bucket", "bucket", "Logical namespace/bucket tag for VictoriaMetrics writes")
+	flag.StringVar(&cfg.Measurement, "measurement", "ftdc", "Metric measurement prefix")
 	flag.IntVar(&cfg.Parallel, "parallel", 4, "Number of files to process in parallel")
 	flag.IntVar(&cfg.BatchSize, "batch-size", 1000, "Number of FTDC metrics per batch")
 	flag.IntVar(&cfg.BatchBuffer, "batch-buffer", 1, "Number of batches to queue before blocking")
@@ -53,7 +42,7 @@ func ParseFlags() *Config {
 	flag.BoolVar(&cfg.Debug, "debug", false, "Enable debug logging")
 	flag.BoolVar(&cfg.WaitForever, "wait-forever", true, "Wait indefinitely")
 	flag.StringVar(&cfg.VictoriaURL, "victoria-url", "http://victoriametrics:8428", "VictoriaMetrics base URL (e.g., http://localhost:8428)")
-	flag.StringVar(&cfg.VictoriaToken, "victoria-token", "", "VictoriaMetrics token for Influx-compatible writes")
+	flag.StringVar(&cfg.VictoriaToken, "victoria-token", "", "VictoriaMetrics token for writes")
 	flag.StringVar(&cfg.VictoriaTenant, "victoria-tenant", "", "VictoriaMetrics tenant (X-Scope-OrgID header)")
 	flag.StringVar(&cfg.VictoriaUsername, "victoria-username", "", "VictoriaMetrics basic auth username")
 	flag.StringVar(&cfg.VictoriaPassword, "victoria-password", "", "VictoriaMetrics basic auth password")
@@ -73,13 +62,8 @@ func (cfg *Config) Print() {
 	fmt.Println("------------------------------------------------------------")
 	fmt.Printf("%-20s : %s\n", "Input Directory", cfg.InputDir)
 	fmt.Printf("%-20s : %s\n", "Metrics filter list", cfg.MetricsIncludeFile)
-	fmt.Printf("%-20s : %s\n", "Influx URL", cfg.InfluxURL)
-	fmt.Printf("%-20s : %t\n", "Influx Gzip", cfg.InfluxUseGZip)
-	fmt.Printf("%-20s : %s\n", "Influx Token", cfg.InfluxToken)
-	fmt.Printf("%-20s : %s\n", "Influx Org", cfg.InfluxOrg)
-	fmt.Printf("%-20s : %s\n", "Influx Bucket", cfg.InfluxBucket)
-	fmt.Printf("%-20s : %s\n", "Influx Measurement", cfg.InfluxMeasurement)
-	fmt.Printf("%-20s : %s\n", "Storage Backend", cfg.StorageBackend)
+	fmt.Printf("%-20s : %s\n", "Bucket", cfg.Bucket)
+	fmt.Printf("%-20s : %s\n", "Measurement", cfg.Measurement)
 	fmt.Printf("%-20s : %s\n", "Victoria URL", cfg.VictoriaURL)
 	fmt.Printf("%-20s : %t\n", "Victoria Gzip", cfg.VictoriaUseGZip)
 	if cfg.VictoriaTenant != "" {
@@ -102,20 +86,8 @@ func validateOrExit(cfg *Config) {
 	if cfg.MetricsIncludeFile == "" {
 		missing = append(missing, "--metrics-include-file")
 	}
-
-	cfg.StorageBackend = strings.ToLower(strings.TrimSpace(cfg.StorageBackend))
-	switch cfg.StorageBackend {
-	case string(storage.BackendVictoria):
-		if cfg.VictoriaURL == "" {
-			missing = append(missing, "--victoria-url")
-		}
-	case string(storage.BackendInflux):
-		if cfg.InfluxURL == "" {
-			missing = append(missing, "--influx-url")
-		}
-	default:
-		fmt.Printf("Unsupported storage backend: %s\n", cfg.StorageBackend)
-		os.Exit(1)
+	if cfg.VictoriaURL == "" {
+		missing = append(missing, "--victoria-url")
 	}
 
 	if len(missing) > 0 {
@@ -135,18 +107,10 @@ func resolvePaths(cfg *Config) {
 
 func (cfg *Config) StorageOptions() storage.Config {
 	return storage.Config{
-		Backend:     storage.Backend(cfg.StorageBackend),
-		Measurement: cfg.InfluxMeasurement,
-		Influx: storage.InfluxConfig{
-			Org:     cfg.InfluxOrg,
-			Bucket:  cfg.InfluxBucket,
-			URL:     cfg.InfluxURL,
-			Token:   cfg.InfluxToken,
-			UseGzip: cfg.InfluxUseGZip,
-		},
+		Measurement: cfg.Measurement,
 		Victoria: storage.VictoriaConfig{
 			URL:      cfg.VictoriaURL,
-			Bucket:   cfg.InfluxBucket,
+			Bucket:   cfg.Bucket,
 			Tenant:   cfg.VictoriaTenant,
 			Token:    cfg.VictoriaToken,
 			Username: cfg.VictoriaUsername,

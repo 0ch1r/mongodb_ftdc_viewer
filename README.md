@@ -1,7 +1,7 @@
 
 mongodb_ftdc_viewer is a reimagined and performance-focused evolution of zelmario/Big-hole - kudos to zelmario for the original work.
 
-It provides a fast, reliable way to process MongoDB diagnostics data and push it to **VictoriaMetrics** (or optionally InfluxDB) at high speed. Metrics can then be explored through a Docker-hosted Grafana instance.
+It provides a fast, reliable way to process MongoDB diagnostics data and push it to **VictoriaMetrics** at high speed. Metrics can then be explored through a Docker-hosted Grafana instance.
 
 ![Screenshoot](https://github.com/devops-land/mongodb_ftdc_viewer/blob/main/ftdc_exporter.png?raw=true)
 
@@ -74,9 +74,6 @@ All dots in FTDC metric names are replaced with underscores, and tags (hostname,
 
 ### Data Retention
 By default, VictoriaMetrics retains data for 30 days. You can adjust this via the `VICTORIA_RETENTION_DAYS` environment variable in `run.sh`.
-
-### Optional: Using InfluxDB Instead
-If you prefer InfluxDB, set `STORAGE_BACKEND=influx` in `run.sh` and configure the Influx-specific flags.
 
 
 ## License

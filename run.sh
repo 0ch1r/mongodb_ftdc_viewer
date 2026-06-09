@@ -4,7 +4,6 @@
 # default configuration
 export PARALLEL=${PARALLEL:-10}
 export BATCH_SIZE=${BATCH_SIZE:-200}
-export STORAGE_BACKEND=${STORAGE_BACKEND:-victoriametrics}
 export VICTORIA_DATA_DIRECTORY=${VICTORIA_DATA_DIRECTORY:-/tmp/victoria_data}
 export VICTORIA_RETENTION_DAYS=${VICTORIA_RETENTION_DAYS:-30}
 export VICTORIA_TOKEN=${VICTORIA_TOKEN:-}
@@ -12,13 +11,13 @@ export VICTORIA_TENANT=${VICTORIA_TENANT:-}
 export VICTORIA_USERNAME=${VICTORIA_USERNAME:-}
 export VICTORIA_PASSWORD=${VICTORIA_PASSWORD:-}
 export GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-"$(uuidgen)"}
-export INFLUX_BUCKET=${INFLUX_BUCKET:-bucket}
+export BUCKET=${BUCKET:-bucket}
 
 # --- Parse CLI args ---
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
     --input-dir) export INPUT_DIR="$2"; shift 2 ;;
-    --influx-bucket) export INFLUX_BUCKET="$2"; shift 2 ;;
+    --bucket) export BUCKET="$2"; shift 2 ;;
     --parallel) export PARALLEL="$2"; shift 2 ;;
     --batch-size) export BATCH_SIZE="$2"; shift 2 ;;
     --victoria-data-directory) export VICTORIA_DATA_DIRECTORY="$2"; shift 2 ;;
@@ -30,12 +29,11 @@ Usage: ./run.sh --input-dir /path/to/diagnostic.data [options]
 Common options:
   --parallel <int>               Number of files to process in parallel (default: 10)
   --batch-size <int>             FTDC docs per batch (default: 200)
-  --influx-bucket <name>         Logical bucket/tag namespace (used for both backends)
+  --bucket <name>                Logical bucket/tag namespace for writes
   --victoria-data-directory <p>  Host path to persist VictoriaMetrics data (default: /tmp/victoria_data)
   --victoria-retention-days <n>  Data retention period (default: 30)
 
 VictoriaMetrics backend (default):
-  STORAGE_BACKEND=victoriametrics (default)
   --victoria-url <url>           Override VictoriaMetrics base URL (default: http://victoriametrics:8428)
   --victoria-token <token>       Optional token header for /api/v2/write
   --victoria-tenant <tenant>     Optional multi-tenant header (X-Scope-OrgID)
@@ -45,8 +43,6 @@ VictoriaMetrics backend (default):
 Example:
   ./run.sh --input-dir ./diagnostic.data --victoria-data-directory /data/vm \
            --victoria-retention-days 14 --parallel 6
-
-To use InfluxDB instead, export STORAGE_BACKEND=influx and pass the legacy --influx-* flags.
 EOF
       exit 0
       ;;

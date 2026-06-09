@@ -64,12 +64,11 @@ services:
       ./ftdc_exporter
        --input-dir /diagnostic.data
        --metrics-include-file /app/metrics_to_get.txt
-       --storage-backend ${STORAGE_BACKEND:-victoriametrics}
        --victoria-url http://victoriametrics:8428
        --victoria-token ${VICTORIA_TOKEN:-}
        --victoria-tenant ${VICTORIA_TENANT:-}
        --victoria-username ${VICTORIA_USERNAME:-}
        --victoria-password ${VICTORIA_PASSWORD:-}
-       --influx-bucket ${INFLUX_BUCKET:-bucket}
+       --bucket ${BUCKET:-bucket}
        --parallel ${PARALLEL:-10}
        --batch-size ${BATCH_SIZE:-200}
