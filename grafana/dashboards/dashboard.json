@@ -36,8 +36,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "description": "Tickets Available Read displays the number of read tickets available to the WiredTiger storage engine. Read tickets represent the number of concurrent read operations allowed into the storage engine. When this value reaches zero, new read requests might queue until a read ticket becomes available.\n\nTickets Available Write displays the number of write tickets available to the WiredTiger storage engine. Write tickets represent the number of concurrent write operations allowed into the storage engine. When this value reaches zero, new write requests might queue until a write ticket becomes available.",
       "fieldConfig": {
@@ -126,12 +126,14 @@
       "pluginVersion": "12.2.0",
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "fdnvtvpv64tfkc"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"serverStatus.wiredTiger.concurrentTransactions.write.available\" or r[\"_field\"] == \"serverStatus.wiredTiger.concurrentTransactions.read.available\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n",
+          "expr": "last_over_time({__name__=\"ftdc_serverStatus.wiredTiger.concurrentTransactions.write.available\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])",
+          "legendFormat": "serverStatus.wiredTiger.concurrentTransactions.write.available",
           "refId": "A"
+        },
+        {
+          "expr": "last_over_time({__name__=\"ftdc_serverStatus.wiredTiger.concurrentTransactions.read.available\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])",
+          "legendFormat": "serverStatus.wiredTiger.concurrentTransactions.read.available",
+          "refId": "B"
         }
       ],
       "title": "WiredTiger Tickets",
@@ -139,8 +141,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "description": "used displays the total bytes cached in memory for serving reads and writes.\n\nThese metrics include both indexes and data from the working set.\n\nSustained high cache usage indicates the RAM is too small for your workloads. Optimize your queries to avoid frequent disk reads. If write operations make cache usage high, throttle them.",
       "fieldConfig": {
@@ -225,13 +227,14 @@
       "pluginVersion": "12.2.0",
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "hide": false,
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) =>  r[\"_field\"] == \"serverStatus.wiredTiger.cache.maximum bytes configured\"  or r[\"_field\"] == \"serverStatus.wiredTiger.cache.bytes currently in the cache\" )\r\n  |> map(fn: (r) => ({ r with _value: r._value / 1024 / 1024 / 1024}))\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n\r\n",
+          "expr": "(last_over_time({__name__=\"ftdc_serverStatus.wiredTiger.cache.maximum bytes configured\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])) * 9.31322574615e-10",
+          "legendFormat": "serverStatus.wiredTiger.cache.maximum bytes configured",
           "refId": "A"
+        },
+        {
+          "expr": "(last_over_time({__name__=\"ftdc_serverStatus.wiredTiger.cache.bytes currently in the cache\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])) * 9.31322574615e-10",
+          "legendFormat": "serverStatus.wiredTiger.cache.bytes currently in the cache",
+          "refId": "B"
         }
       ],
       "title": "WiredTiger cache",
@@ -239,8 +242,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "description": "read Into displays the rate in bytes per second of data read from disk into memory to service queries.\n\nwritten From  displays the rate in bytes per second of data written from memory into disk to service writes.",
       "fieldConfig": {
@@ -323,12 +326,14 @@
       "pluginVersion": "12.2.0",
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) =>  r[\"_field\"] == \"serverStatus.wiredTiger.cache.bytes written from cache\" or r[\"_field\"] == \"serverStatus.wiredTiger.cache.bytes read into cache\")\r\n  |> derivative(unit: 1s)\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)",
+          "expr": "deriv({__name__=\"ftdc_serverStatus.wiredTiger.cache.bytes written from cache\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.wiredTiger.cache.bytes written from cache",
           "refId": "A"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.wiredTiger.cache.bytes read into cache\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.wiredTiger.cache.bytes read into cache",
+          "refId": "B"
         }
       ],
       "title": "Mb read into cache / written from cache",
@@ -336,8 +341,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "description": "Clean vs dirty data\n\nClean refers to data in the cache that is identical to the version stored on disk.\nDirty refers to data in the cache that has been modified and needs to be reconciled with the data stored on the disk.\n\nClean vs dirty eviction\n\nIn the case of clean eviction, there is no dirty content on the page and it is directly removed from the memory. After that, the page remains solely on the disk unchanged.\nIn the case of dirty eviction, the dirty page goes through reconciliation. The obsolete content on the page is thrown out, the latest value goes to the data store and older values go to the history store.",
       "fieldConfig": {
@@ -421,12 +426,14 @@
       "pluginVersion": "12.2.0",
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"serverStatus.wiredTiger.cache.modified pages evicted\" or r[\"_field\"] == \"serverStatus.wiredTiger.cache.unmodified pages evicted\")\r\n  |> map(fn: (r) => ({ r with _value: r._value }))\r\n  |> derivative(unit: 1s)\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n",
+          "expr": "deriv({__name__=\"ftdc_serverStatus.wiredTiger.cache.modified pages evicted\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.wiredTiger.cache.modified pages evicted",
           "refId": "A"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.wiredTiger.cache.unmodified pages evicted\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.wiredTiger.cache.unmodified pages evicted",
+          "refId": "B"
         }
       ],
       "title": "Pages Evicted",
@@ -434,8 +441,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "description": "indicates modified data that needs to be written to the data files via a checkpoint.",
       "fieldConfig": {
@@ -544,11 +551,8 @@
       "pluginVersion": "12.2.0",
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) =>  r[\"_field\"] == \"serverStatus.wiredTiger.cache.tracked dirty bytes in the cache\" )\r\n  |> map(fn: (r) => ({ r with _value: r._value}))\r\n\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n  |> yield(name: \"last\")",
+          "expr": "last_over_time({__name__=\"ftdc_serverStatus.wiredTiger.cache.tracked dirty bytes in the cache\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])",
+          "legendFormat": "serverStatus.wiredTiger.cache.tracked dirty bytes in the cache",
           "refId": "A"
         }
       ],
@@ -557,8 +561,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "description": "A checkpoint is a known point in time from which WiredTiger can recover in the event of a crash or unexpected shutdown.",
       "fieldConfig": {
@@ -642,11 +646,8 @@
       "pluginVersion": "12.2.0",
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"serverStatus.wiredTiger.block-manager.bytes written for checkpoint\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n  |> derivative(unit: v.windowPeriod)\r\n",
+          "expr": "deriv({__name__=\"ftdc_serverStatus.wiredTiger.block-manager.bytes written for checkpoint\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.wiredTiger.block-manager.bytes written for checkpoint",
           "refId": "A"
         }
       ],
@@ -655,8 +656,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "description": "The WiredTiger block manager subsystem manages the reading and writing of data from the disk. It is designed to facilitate high performance, economic use of disk space and customizability.",
       "fieldConfig": {
@@ -739,12 +740,14 @@
       "pluginVersion": "12.2.0",
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) =>   r[\"_field\"] == \"serverStatus.wiredTiger.block-manager.bytes read\" or r[\"_field\"] == \"serverStatus.wiredTiger.block-manager.bytes written\" )\r\n  |> map(fn: (r) => ({ r with _value: r._value}))\r\n  |> map(fn: (r) => ({ r with _value: r._value / 1024 /1024 }))\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n  |> derivative(unit: 1s)\r\n",
+          "expr": "deriv({__name__=\"ftdc_serverStatus.wiredTiger.block-manager.bytes read\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.wiredTiger.block-manager.bytes read",
           "refId": "A"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.wiredTiger.block-manager.bytes written\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.wiredTiger.block-manager.bytes written",
+          "refId": "B"
         }
       ],
       "title": "wiredTiger Block Manager",
@@ -752,8 +755,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "description": "A WiredTiger Data Handle (dhandle) is a generic representation of any named data source. This representation contains information such as its name, how many references there are to it, individual data source statistics and what type of underlying data object it is.\n\nWiredTiger maintains all dhandles in a global dhandle list accessed from the connection. Multiple sessions access this list, which is protected by a R/W lock. Each session also maintains a session dhandle cache which is a cache of dhandles a session has operated upon. The entries in the cache are references into the global dhandle list.",
       "fieldConfig": {
@@ -835,11 +838,8 @@
       "pluginVersion": "12.2.0",
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"serverStatus.wiredTiger.data-handle.connection data handles currently active\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n  |> yield(name: \"last\")",
+          "expr": "last_over_time({__name__=\"ftdc_serverStatus.wiredTiger.data-handle.connection data handles currently active\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])",
+          "legendFormat": "serverStatus.wiredTiger.data-handle.connection data handles currently active",
           "refId": "A"
         }
       ],
@@ -861,8 +861,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -945,12 +945,14 @@
       "pluginVersion": "12.2.0",
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "influxdb"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"serverStatus.mem.virtual\" or r[\"_field\"] == \"serverStatus.mem.resident\")\r\n  |> aggregateWindow(every: 1m, fn: median, createEmpty: false)\r\n  |> map(fn: (r) => ({ r with _value: r._value / 1000.0 }))\r\n  |> yield(name: \"median\")\r\n",
+          "expr": "(quantile_over_time(0.5, {__name__=\"ftdc_serverStatus.mem.virtual\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])) * 0.001",
+          "legendFormat": "serverStatus.mem.virtual",
           "refId": "A"
+        },
+        {
+          "expr": "(quantile_over_time(0.5, {__name__=\"ftdc_serverStatus.mem.resident\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])) * 0.001",
+          "legendFormat": "serverStatus.mem.resident",
+          "refId": "B"
         }
       ],
       "title": "Memory",
@@ -958,8 +960,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -1040,11 +1042,8 @@
       "pluginVersion": "12.2.0",
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"serverStatus.extra_info.page_faults\")\r\n  |> derivative(unit: v.windowPeriod)\r\n    |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "expr": "deriv({__name__=\"ftdc_serverStatus.extra_info.page_faults\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.extra_info.page_faults",
           "refId": "A"
         }
       ],
@@ -1053,8 +1052,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -1135,21 +1134,19 @@
       "pluginVersion": "12.2.0",
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "influxdb"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"serverStatus.connections.active\" or r[\"_field\"] == \"serverStatus.connections.current\"   )\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n  |> yield(name: \"last\")\r\n\r\n",
+          "expr": "last_over_time({__name__=\"ftdc_serverStatus.connections.active\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])",
+          "legendFormat": "serverStatus.connections.active",
           "refId": "A"
         },
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "influxdb"
-          },
-          "hide": false,
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"serverStatus.connections.totalCreated\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n  |> derivative(unit: v.windowPeriod)",
+          "expr": "last_over_time({__name__=\"ftdc_serverStatus.connections.current\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])",
+          "legendFormat": "serverStatus.connections.current",
           "refId": "B"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.connections.totalCreated\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.connections.totalCreated",
+          "refId": "C"
         }
       ],
       "title": "Connections",
@@ -1157,8 +1154,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -1236,12 +1233,19 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"serverStatus.opLatencies.reads.latency\" or r[\"_field\"] == \"serverStatus.opLatencies.writes.latency\" or r[\"_field\"] == \"serverStatus.opLatencies.commands.latency\"  )\r\n  |> derivative(unit: v.windowPeriod)\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\r\n",
+          "expr": "deriv({__name__=\"ftdc_serverStatus.opLatencies.reads.latency\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.opLatencies.reads.latency",
           "refId": "A"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.opLatencies.writes.latency\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.opLatencies.writes.latency",
+          "refId": "B"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.opLatencies.commands.latency\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.opLatencies.commands.latency",
+          "refId": "C"
         }
       ],
       "title": "Latency",
@@ -1249,8 +1253,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "description": "",
       "fieldConfig": {
@@ -1327,12 +1331,34 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => \r\n      r[\"_field\"] == \"serverStatus.opcounters.update\" or\r\n      r[\"_field\"] == \"serverStatus.opcounters.query\" or\r\n      r[\"_field\"] == \"serverStatus.opcounters.insert\" or\r\n      r[\"_field\"] == \"serverStatus.opcounters.getmore\" or\r\n      r[\"_field\"] == \"serverStatus.opcounters.delete\" or\r\n      r[\"_field\"] == \"serverStatus.opcounters.command\")\r\n  |> derivative(unit: 1s, nonNegative: true)\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)",
+          "expr": "deriv({__name__=\"ftdc_serverStatus.opcounters.update\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.opcounters.update",
           "refId": "A"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.opcounters.query\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.opcounters.query",
+          "refId": "B"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.opcounters.insert\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.opcounters.insert",
+          "refId": "C"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.opcounters.getmore\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.opcounters.getmore",
+          "refId": "D"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.opcounters.delete\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.opcounters.delete",
+          "refId": "E"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.opcounters.command\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.opcounters.command",
+          "refId": "F"
         }
       ],
       "title": "Operations",
@@ -1340,8 +1366,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -1417,11 +1443,8 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"serverStatus.network.numRequests\")\r\n  |> derivative(unit: v.windowPeriod)\r\n    |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "expr": "deriv({__name__=\"ftdc_serverStatus.network.numRequests\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.network.numRequests",
           "refId": "A"
         }
       ],
@@ -1430,8 +1453,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -1482,7 +1505,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -1507,12 +1531,14 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"serverStatus.globalLock.currentQueue.writers\" or r[\"_field\"] == \"serverStatus.globalLock.currentQueue.readers\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n  |> yield(name: \"last\")",
+          "expr": "last_over_time({__name__=\"ftdc_serverStatus.globalLock.currentQueue.writers\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])",
+          "legendFormat": "serverStatus.globalLock.currentQueue.writers",
           "refId": "A"
+        },
+        {
+          "expr": "last_over_time({__name__=\"ftdc_serverStatus.globalLock.currentQueue.readers\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])",
+          "legendFormat": "serverStatus.globalLock.currentQueue.readers",
+          "refId": "B"
         }
       ],
       "title": "Current Queue writers / readers",
@@ -1520,8 +1546,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -1536,7 +1562,7 @@
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
-            "fillOpacity": 25,
+            "fillOpacity": 0,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -1554,13 +1580,14 @@
             "spanNulls": false,
             "stacking": {
               "group": "A",
-              "mode": "normal"
+              "mode": "none"
             },
             "thresholdsStyle": {
               "mode": "off"
             }
           },
           "mappings": [],
+          "max": 1,
           "min": 0,
           "thresholds": {
             "mode": "absolute",
@@ -1600,11 +1627,8 @@
       "pluginVersion": "10.4.3",
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"replSetGetStatus.members.0.health\" or r[\"_field\"] == \"replSetGetStatus.members.1.health\" or r[\"_field\"] == \"replSetGetStatus.members.2.health\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n  |> yield(name: \"last\")",
+          "expr": "label_replace(last_over_time({__name__=~\"ftdc_replSetGetStatus\\\\.members\\\\.\\\\d+\\\\.health\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval]), \"member\", \"$1\", \"__name__\", \"ftdc_replSetGetStatus\\\\.members\\\\.(\\\\d+)\\\\.health\")",
+          "legendFormat": "member {{member}} health",
           "refId": "A"
         }
       ],
@@ -1613,8 +1637,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -1692,11 +1716,8 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] =~ /replSetGetStatus\\.members\\.\\d+\\.lastAppliedWallTime|serverStatus\\.localTime/)\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n  |> pivot(rowKey:[\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\r\n  |> map(fn: (r) => ({\r\n      _time: r._time,\r\n      member_0: if exists r[\"replSetGetStatus.members.0.lastAppliedWallTime\"] then (float(v: r[\"serverStatus.localTime\"]) - float(v: r[\"replSetGetStatus.members.0.lastAppliedWallTime\"])) / 1000.0 else 0.0,\r\n      member_1: if exists r[\"replSetGetStatus.members.1.lastAppliedWallTime\"] then (float(v: r[\"serverStatus.localTime\"]) - float(v: r[\"replSetGetStatus.members.1.lastAppliedWallTime\"])) / 1000.0 else 0.0,\r\n      member_2: if exists r[\"replSetGetStatus.members.2.lastAppliedWallTime\"] then (float(v: r[\"serverStatus.localTime\"]) - float(v: r[\"replSetGetStatus.members.2.lastAppliedWallTime\"])) / 1000.0 else 0.0,\r\n      member_3: if exists r[\"replSetGetStatus.members.3.lastAppliedWallTime\"] then (float(v: r[\"serverStatus.localTime\"]) - float(v: r[\"replSetGetStatus.members.3.lastAppliedWallTime\"])) / 1000.0 else 0.0,      // Add more members as needed\r\n  }))\r\n  |> yield(name: \"differences\")\r\n",
+          "expr": "-1 * (label_replace(last_over_time({__name__=~\"ftdc_replSetGetStatus\\\\.members\\\\.\\\\d+\\\\.lastAppliedWallTime\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval]), \"member\", \"$1\", \"__name__\", \"ftdc_replSetGetStatus\\\\.members\\\\.(\\\\d+)\\\\.lastAppliedWallTime\") - on(hostname, version) group_left() last_over_time({__name__=\"ftdc_serverStatus.localTime\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval]))",
+          "legendFormat": "member {{member}} lag",
           "refId": "A"
         }
       ],
@@ -1705,8 +1726,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "description": "Operation latencies for the instance as a whole.",
       "fieldConfig": {
@@ -1759,7 +1780,7 @@
               }
             ]
           },
-          "unit": "µs"
+          "unit": "\u00b5s"
         },
         "overrides": []
       },
@@ -1784,12 +1805,19 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"serverStatus.opLatencies.reads.ops\" or r[\"_field\"] == \"serverStatus.opLatencies.writes.ops\" or r[\"_field\"] == \"serverStatus.opLatencies.commands.ops\" )\r\n  |> derivative(unit: 1s)\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n",
+          "expr": "deriv({__name__=\"ftdc_serverStatus.opLatencies.reads.ops\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.opLatencies.reads.ops",
           "refId": "A"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.opLatencies.writes.ops\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.opLatencies.writes.ops",
+          "refId": "B"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.opLatencies.commands.ops\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.opLatencies.commands.ops",
+          "refId": "C"
         }
       ],
       "title": "Operations latencies op",
@@ -1797,8 +1825,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "description": "",
       "fieldConfig": {
@@ -1810,7 +1838,7 @@
             "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
-            "axisLabel": "",
+            "axisLabel": "days",
             "axisPlacement": "auto",
             "axisSoftMin": 0,
             "barAlignment": 0,
@@ -1839,6 +1867,7 @@
               "mode": "off"
             }
           },
+          "decimals": 1,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -1852,7 +1881,7 @@
               }
             ]
           },
-          "unit": "none"
+          "unit": "short"
         },
         "overrides": []
       },
@@ -1877,12 +1906,8 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "hide": false,
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) =>  r[\"_field\"] == \"serverStatus.uptime\" )\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n\r\n",
+          "expr": "(last_over_time({__name__=\"ftdc_serverStatus.uptime\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])) / 86400",
+          "legendFormat": "serverStatus.uptime (days)",
           "refId": "A"
         }
       ],
@@ -1891,8 +1916,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -1969,11 +1994,8 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] =~ /replSetGetStatus\\.members\\.\\d+\\.pingMs/)\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n",
+          "expr": "last_over_time({__name__=~\"ftdc_replSetGetStatus\\\\.members\\\\.\\\\d+\\\\.pingMs\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])",
+          "legendFormat": "{{__name__}}",
           "refId": "A"
         }
       ],
@@ -1982,8 +2004,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -2035,7 +2057,7 @@
               }
             ]
           },
-          "unit": "µs"
+          "unit": "\u00b5s"
         },
         "overrides": [
           {
@@ -2085,11 +2107,8 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"serverStatus.flowControl.isLaggedTimeMicros\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n  |> derivative(unit: v.windowPeriod)\r\n  |> yield(name: \"last\")",
+          "expr": "deriv({__name__=\"ftdc_serverStatus.flowControl.isLaggedTimeMicros\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.flowControl.isLaggedTimeMicros",
           "refId": "A"
         }
       ],
@@ -2098,8 +2117,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -2175,12 +2194,29 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"serverStatus.asserts.warning\" or r[\"_field\"] == \"serverStatus.asserts.user\" or r[\"_field\"] == \"serverStatus.asserts.rollovers\" or r[\"_field\"] == \"serverStatus.asserts.regular\" or r[\"_field\"] == \"serverStatus.asserts.msg\")\r\n  |> derivative(unit: v.windowPeriod)\r\n    |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "expr": "deriv({__name__=\"ftdc_serverStatus.asserts.warning\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.asserts.warning",
           "refId": "A"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.asserts.user\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.asserts.user",
+          "refId": "B"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.asserts.rollovers\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.asserts.rollovers",
+          "refId": "C"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.asserts.regular\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.asserts.regular",
+          "refId": "D"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.asserts.msg\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.asserts.msg",
+          "refId": "E"
         }
       ],
       "title": "Asserts",
@@ -2188,8 +2224,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -2266,12 +2302,19 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"serverStatus.metrics.queryExecutor.scannedObjects\" or r[\"_field\"] == \"serverStatus.metrics.queryExecutor.scanned\" or r[\"_field\"] == \"serverStatus.metrics.queryExecutor.collectionScans.total\")\r\n  |> derivative(unit: v.windowPeriod)\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "expr": "deriv({__name__=\"ftdc_serverStatus.metrics.queryExecutor.scannedObjects\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.metrics.queryExecutor.scannedObjects",
           "refId": "A"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.metrics.queryExecutor.scanned\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.metrics.queryExecutor.scanned",
+          "refId": "B"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.metrics.queryExecutor.collectionScans.total\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.metrics.queryExecutor.collectionScans.total",
+          "refId": "C"
         }
       ],
       "title": "Query Executor",
@@ -2279,8 +2322,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -2356,12 +2399,29 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"serverStatus.metrics.commands.createIndexes.total\" or r[\"_field\"] == \"serverStatus.metrics.commands.dataSize.total\" or r[\"_field\"] == \"serverStatus.metrics.commands.dropIndexes.total\" or r[\"_field\"] == \"serverStatus.metrics.commands.listCollections.total\" or r[\"_field\"] == \"serverStatus.metrics.commands.listDatabases.total\")\r\n|> derivative(unit: v.windowPeriod)\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "expr": "deriv({__name__=\"ftdc_serverStatus.metrics.commands.createIndexes.total\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.metrics.commands.createIndexes.total",
           "refId": "A"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.metrics.commands.dataSize.total\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.metrics.commands.dataSize.total",
+          "refId": "B"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.metrics.commands.dropIndexes.total\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.metrics.commands.dropIndexes.total",
+          "refId": "C"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.metrics.commands.listCollections.total\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.metrics.commands.listCollections.total",
+          "refId": "D"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.metrics.commands.listDatabases.total\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.metrics.commands.listDatabases.total",
+          "refId": "E"
         }
       ],
       "title": "Commands",
@@ -2369,8 +2429,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -2447,11 +2507,8 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"local.oplog.rs.stats.storageStats.avgObjSize\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "expr": "avg_over_time({__name__=\"ftdc_local.oplog.rs.stats.storageStats.avgObjSize\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])",
+          "legendFormat": "local.oplog.rs.stats.storageStats.avgObjSize",
           "refId": "A"
         }
       ],
@@ -2460,8 +2517,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "description": "",
       "fieldConfig": {
@@ -2539,12 +2596,24 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"serverStatus.metrics.cursor.open.noTimeout\" or r[\"_field\"] == \"serverStatus.metrics.cursor.open.pinned\" or r[\"_field\"] == \"serverStatus.metrics.cursor.open.total\" or r[\"_field\"] == \"serverStatus.metrics.cursor.timedOut\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)",
+          "expr": "last_over_time({__name__=\"ftdc_serverStatus.metrics.cursor.open.noTimeout\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])",
+          "legendFormat": "serverStatus.metrics.cursor.open.noTimeout",
           "refId": "A"
+        },
+        {
+          "expr": "last_over_time({__name__=\"ftdc_serverStatus.metrics.cursor.open.pinned\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])",
+          "legendFormat": "serverStatus.metrics.cursor.open.pinned",
+          "refId": "B"
+        },
+        {
+          "expr": "last_over_time({__name__=\"ftdc_serverStatus.metrics.cursor.open.total\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])",
+          "legendFormat": "serverStatus.metrics.cursor.open.total",
+          "refId": "C"
+        },
+        {
+          "expr": "last_over_time({__name__=\"ftdc_serverStatus.metrics.cursor.timedOut\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])",
+          "legendFormat": "serverStatus.metrics.cursor.timedOut",
+          "refId": "D"
         }
       ],
       "title": "Cursors",
@@ -2552,8 +2621,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "description": "",
       "fieldConfig": {
@@ -2630,12 +2699,24 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"serverStatus.metrics.document.updated\" or r[\"_field\"] == \"serverStatus.metrics.document.returned\" or r[\"_field\"] == \"serverStatus.metrics.document.inserted\" or r[\"_field\"] == \"serverStatus.metrics.document.deleted\")\r\n  |> derivative(unit: v.windowPeriod)\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "expr": "deriv({__name__=\"ftdc_serverStatus.metrics.document.updated\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.metrics.document.updated",
           "refId": "A"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.metrics.document.returned\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.metrics.document.returned",
+          "refId": "B"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.metrics.document.inserted\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.metrics.document.inserted",
+          "refId": "C"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.metrics.document.deleted\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.metrics.document.deleted",
+          "refId": "D"
         }
       ],
       "title": "Documents (deleted / inserted / returned / updated)",
@@ -2643,8 +2724,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -2720,12 +2801,34 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"serverStatus.opcountersRepl.command\" or r[\"_field\"] == \"serverStatus.opcountersRepl.delete\" or r[\"_field\"] == \"serverStatus.opcountersRepl.getmore\" or r[\"_field\"] == \"serverStatus.opcountersRepl.insert\" or r[\"_field\"] == \"serverStatus.opcountersRepl.query\" or r[\"_field\"] == \"serverStatus.opcountersRepl.update\")\r\n  |> derivative(unit: v.windowPeriod)\r\n    |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)",
+          "expr": "deriv({__name__=\"ftdc_serverStatus.opcountersRepl.command\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.opcountersRepl.command",
           "refId": "A"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.opcountersRepl.delete\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.opcountersRepl.delete",
+          "refId": "B"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.opcountersRepl.getmore\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.opcountersRepl.getmore",
+          "refId": "C"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.opcountersRepl.insert\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.opcountersRepl.insert",
+          "refId": "D"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.opcountersRepl.query\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.opcountersRepl.query",
+          "refId": "E"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.opcountersRepl.update\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.opcountersRepl.update",
+          "refId": "F"
         }
       ],
       "title": "Opcounters Replica",
@@ -2733,8 +2836,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -2745,7 +2848,7 @@
             "axisBorderShow": false,
             "axisCenteredZero": false,
             "axisColorMode": "text",
-            "axisLabel": "",
+            "axisLabel": "scanned / returned",
             "axisPlacement": "auto",
             "barAlignment": 0,
             "drawStyle": "line",
@@ -2787,7 +2890,8 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "short"
         },
         "overrides": []
       },
@@ -2812,15 +2916,12 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) =>\r\n      r[\"_field\"] == \"serverStatus.metrics.document.returned\" or \r\n      r[\"_field\"] == \"serverStatus.metrics.queryExecutor.scannedObjects\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\r\n  |> pivot(\r\n      rowKey: [\"_time\"],\r\n      columnKey: [\"_field\"],\r\n      valueColumn: \"_value\"\r\n  )\r\n  |> map(fn: (r) => ({\r\n      _time: r._time,\r\n      scanned_returned_ratio: r[\"serverStatus.metrics.queryExecutor.scannedObjects\"] / r[\"serverStatus.metrics.document.returned\"]\r\n  }))\r\n  |> yield(name: \"scanned_returned_ratio\")\r\n",
+          "expr": "clamp_min(deriv({__name__=\"ftdc_serverStatus.metrics.queryExecutor.scannedObjects\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval]), 0) / clamp_min(clamp_min(deriv({__name__=\"ftdc_serverStatus.metrics.document.returned\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval]), 0), 1)",
+          "legendFormat": "scanned / returned",
           "refId": "A"
         }
       ],
-      "title": "Query Targeting: Scanned Objects / Returned ",
+      "title": "Query Targeting: Scanned Objects / Returned",
       "type": "timeseries"
     },
     {
@@ -2838,8 +2939,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -2917,12 +3018,14 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"serverStatus.network.physicalBytesIn\" or r[\"_field\"] == \"serverStatus.network.physicalBytesOut\")\r\n  |> derivative(unit: 1s)\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n",
+          "expr": "deriv({__name__=\"ftdc_serverStatus.network.physicalBytesIn\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.network.physicalBytesIn",
           "refId": "A"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_serverStatus.network.physicalBytesOut\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "serverStatus.network.physicalBytesOut",
+          "refId": "B"
         }
       ],
       "title": "Network In / Out physical",
@@ -2930,8 +3033,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -3008,12 +3111,14 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"serverStatus.network.bytesOut\" or r[\"_field\"] == \"serverStatus.network.bytesIn\")\r\n  |> map(fn: (r) => ({ r with _value: r._value / 1024 /1024 }))\r\n  |> derivative(unit: 1s)\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n",
+          "expr": "(deriv({__name__=\"ftdc_serverStatus.network.bytesOut\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])) * 9.53674316406e-07",
+          "legendFormat": "serverStatus.network.bytesOut",
           "refId": "A"
+        },
+        {
+          "expr": "(deriv({__name__=\"ftdc_serverStatus.network.bytesIn\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])) * 9.53674316406e-07",
+          "legendFormat": "serverStatus.network.bytesIn",
+          "refId": "B"
         }
       ],
       "title": "Network In / Out",
@@ -3021,8 +3126,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "description": "",
       "fieldConfig": {
@@ -3100,12 +3205,14 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"local.oplog.rs.stats.storageStats.freeStorageSize\" or r[\"_field\"] == \"local.oplog.rs.stats.storageStats.storageSize\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\r\n  |> yield(name: \"mean\")",
+          "expr": "avg_over_time({__name__=\"ftdc_local.oplog.rs.stats.storageStats.freeStorageSize\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])",
+          "legendFormat": "local.oplog.rs.stats.storageStats.freeStorageSize",
           "refId": "A"
+        },
+        {
+          "expr": "avg_over_time({__name__=\"ftdc_local.oplog.rs.stats.storageStats.storageSize\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])",
+          "legendFormat": "local.oplog.rs.stats.storageStats.storageSize",
+          "refId": "B"
         }
       ],
       "title": "Storage Size",
@@ -3113,8 +3220,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -3191,12 +3298,19 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r._field == \"systemMetrics.cpu.idle_ms\" or r._field == \"systemMetrics.cpu.user_ms\" or r._field == \"systemMetrics.cpu.iowait_ms\" or r._field == \"systemMetrics.cpu.nice_ms\" or r._field == \"systemMetrics.cpu.softirq_ms\" or r._field == \"systemMetrics.cpu.steal_ms\" or r._field == \"systemMetrics.cpu.system_ms\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n  |> pivot(rowKey:[\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\r\n  |> derivative(unit: 1s, nonNegative: true, columns: [\"systemMetrics.cpu.idle_ms\", \"systemMetrics.cpu.user_ms\", \"systemMetrics.cpu.iowait_ms\", \"systemMetrics.cpu.nice_ms\", \"systemMetrics.cpu.softirq_ms\", \"systemMetrics.cpu.steal_ms\", \"systemMetrics.cpu.system_ms\"])\r\n  |> map(fn: (r) => ({\r\n      _time: r._time,\r\n      idle_ms: r[\"systemMetrics.cpu.idle_ms\"],\r\n      user_ms: r[\"systemMetrics.cpu.user_ms\"],\r\n      iowait_ms: r[\"systemMetrics.cpu.iowait_ms\"],\r\n      nice_ms: r[\"systemMetrics.cpu.nice_ms\"],\r\n      softirq_ms: r[\"systemMetrics.cpu.softirq_ms\"],\r\n      steal_ms: r[\"systemMetrics.cpu.steal_ms\"],\r\n      system_ms: r[\"systemMetrics.cpu.system_ms\"],\r\n      total_ms: r[\"systemMetrics.cpu.idle_ms\"] + r[\"systemMetrics.cpu.user_ms\"] + r[\"systemMetrics.cpu.iowait_ms\"] + r[\"systemMetrics.cpu.nice_ms\"] + r[\"systemMetrics.cpu.softirq_ms\"] + r[\"systemMetrics.cpu.steal_ms\"] + r[\"systemMetrics.cpu.system_ms\"]\r\n  }))\r\n  |> map(fn: (r) => ({\r\n      _time: r._time,\r\n      user: 100.0 * float(v: r.user_ms) / float(v: r.total_ms),\r\n      system: 100.0 * float(v: r.system_ms) / float(v: r.total_ms),\r\n      iowait: 100.0 * float(v: r.iowait_ms) / float(v: r.total_ms),\r\n  }))\r\n",
+          "expr": "100 * rate({__name__=\"ftdc_systemMetrics.cpu.user_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval]) / clamp_min((rate({__name__=\"ftdc_systemMetrics.cpu.idle_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval]) + rate({__name__=\"ftdc_systemMetrics.cpu.user_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval]) + rate({__name__=\"ftdc_systemMetrics.cpu.iowait_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval]) + rate({__name__=\"ftdc_systemMetrics.cpu.nice_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval]) + rate({__name__=\"ftdc_systemMetrics.cpu.softirq_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval]) + rate({__name__=\"ftdc_systemMetrics.cpu.steal_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval]) + rate({__name__=\"ftdc_systemMetrics.cpu.system_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])), 1e-9)",
+          "legendFormat": "user",
           "refId": "A"
+        },
+        {
+          "expr": "100 * rate({__name__=\"ftdc_systemMetrics.cpu.system_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval]) / clamp_min((rate({__name__=\"ftdc_systemMetrics.cpu.idle_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval]) + rate({__name__=\"ftdc_systemMetrics.cpu.user_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval]) + rate({__name__=\"ftdc_systemMetrics.cpu.iowait_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval]) + rate({__name__=\"ftdc_systemMetrics.cpu.nice_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval]) + rate({__name__=\"ftdc_systemMetrics.cpu.softirq_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval]) + rate({__name__=\"ftdc_systemMetrics.cpu.steal_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval]) + rate({__name__=\"ftdc_systemMetrics.cpu.system_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])), 1e-9)",
+          "legendFormat": "system",
+          "refId": "B"
+        },
+        {
+          "expr": "100 * rate({__name__=\"ftdc_systemMetrics.cpu.iowait_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval]) / clamp_min((rate({__name__=\"ftdc_systemMetrics.cpu.idle_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval]) + rate({__name__=\"ftdc_systemMetrics.cpu.user_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval]) + rate({__name__=\"ftdc_systemMetrics.cpu.iowait_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval]) + rate({__name__=\"ftdc_systemMetrics.cpu.nice_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval]) + rate({__name__=\"ftdc_systemMetrics.cpu.softirq_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval]) + rate({__name__=\"ftdc_systemMetrics.cpu.steal_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval]) + rate({__name__=\"ftdc_systemMetrics.cpu.system_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])), 1e-9)",
+          "legendFormat": "iowait",
+          "refId": "C"
         }
       ],
       "title": "CPU Usage",
@@ -3204,8 +3318,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -3281,12 +3395,14 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r._field =~ /^systemMetrics\\.disks\\..*\\.writes$/ or r._field =~ /^systemMetrics\\.disks\\..*\\.reads$/)\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n  |> derivative(unit: 1s)\r\n",
-          "refId": "A"
+          "refId": "A",
+          "expr": "deriv(label_replace({__name__=~\"ftdc_systemMetrics[.]disks[.].*[.]writes\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"},\"device\",\"$1\",\"__name__\",\"ftdc_systemMetrics[.]disks[.]([^.]+)[.]writes\")[$__rate_interval])",
+          "legendFormat": "{{device}} writes/s"
+        },
+        {
+          "refId": "B",
+          "expr": "deriv(label_replace({__name__=~\"ftdc_systemMetrics[.]disks[.].*[.]reads\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"},\"device\",\"$1\",\"__name__\",\"ftdc_systemMetrics[.]disks[.]([^.]+)[.]reads\")[$__rate_interval])",
+          "legendFormat": "{{device}} reads/s"
         }
       ],
       "title": "Disk writes and reads",
@@ -3294,8 +3410,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -3372,12 +3488,14 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"systemMetrics.memory.MemAvailable_kb\" or r[\"_field\"] == \"systemMetrics.memory.MemFree_kb\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\r\n  |> yield(name: \"mean\")",
+          "expr": "avg_over_time({__name__=\"ftdc_systemMetrics.memory.MemAvailable_kb\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])",
+          "legendFormat": "systemMetrics.memory.MemAvailable_kb",
           "refId": "A"
+        },
+        {
+          "expr": "avg_over_time({__name__=\"ftdc_systemMetrics.memory.MemFree_kb\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])",
+          "legendFormat": "systemMetrics.memory.MemFree_kb",
+          "refId": "B"
         }
       ],
       "title": "Memory",
@@ -3385,8 +3503,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "description": "",
       "fieldConfig": {
@@ -3464,21 +3582,19 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) =>  r._field =~ /^systemMetrics\\.disks\\..*\\.io_in_progress$/ or r._field =~ /^systemMetrics\\.disks\\..*\\.io_queued_ms$/ or r._field =~ /^systemMetrics\\.disks\\..*\\.io_time_ms$/)\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\r\n  |> derivative(unit: v.windowPeriod)",
-          "refId": "A"
+          "refId": "A",
+          "expr": "last_over_time(label_replace({__name__=~\"ftdc_systemMetrics[.]disks[.].*[.]io_in_progress\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"},\"device\",\"$1\",\"__name__\",\"ftdc_systemMetrics[.]disks[.]([^.]+)[.]io_in_progress\")[$__interval])",
+          "legendFormat": "{{device}} io_in_progress"
         },
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "hide": false,
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) =>  r._field =~ /^systemMetrics\\.disks\\..*\\.io_in_progress$/ )\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n\r\n\r\n\r\n",
-          "refId": "B"
+          "refId": "B",
+          "expr": "deriv(label_replace({__name__=~\"ftdc_systemMetrics[.]disks[.].*[.]io_queued_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"},\"device\",\"$1\",\"__name__\",\"ftdc_systemMetrics[.]disks[.]([^.]+)[.]io_queued_ms\")[$__rate_interval])",
+          "legendFormat": "{{device}} io_queued_ms/s"
+        },
+        {
+          "refId": "C",
+          "expr": "deriv(label_replace({__name__=~\"ftdc_systemMetrics[.]disks[.].*[.]io_time_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"},\"device\",\"$1\",\"__name__\",\"ftdc_systemMetrics[.]disks[.]([^.]+)[.]io_time_ms\")[$__rate_interval])",
+          "legendFormat": "{{device}} io_time_ms/s"
         }
       ],
       "title": "Disk I/O",
@@ -3486,8 +3602,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -3564,21 +3680,19 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) =>  r._field =~ /^systemMetrics\\.disks\\..*\\.write_sectors$/ or r._field =~ /^systemMetrics\\.disks\\..*\\.write_time_ms$/ or r._field =~ /^systemMetrics\\.disks\\..*\\.writes_merged$/)\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\r\n  |> derivative(unit: v.windowPeriod)",
-          "refId": "A"
+          "refId": "A",
+          "expr": "deriv(label_replace({__name__=~\"ftdc_systemMetrics[.]disks[.].*[.]write_sectors\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"},\"device\",\"$1\",\"__name__\",\"ftdc_systemMetrics[.]disks[.]([^.]+)[.]write_sectors\")[$__rate_interval])",
+          "legendFormat": "{{device}} write_sectors/s"
         },
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "hide": false,
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) =>  r._field =~ /^systemMetrics\\.disks\\..*\\.io_in_progress$/ )\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n\r\n\r\n\r\n",
-          "refId": "B"
+          "refId": "B",
+          "expr": "deriv(label_replace({__name__=~\"ftdc_systemMetrics[.]disks[.].*[.]write_time_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"},\"device\",\"$1\",\"__name__\",\"ftdc_systemMetrics[.]disks[.]([^.]+)[.]write_time_ms\")[$__rate_interval])",
+          "legendFormat": "{{device}} write_time_ms/s"
+        },
+        {
+          "refId": "C",
+          "expr": "deriv(label_replace({__name__=~\"ftdc_systemMetrics[.]disks[.].*[.]writes_merged\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"},\"device\",\"$1\",\"__name__\",\"ftdc_systemMetrics[.]disks[.]([^.]+)[.]writes_merged\")[$__rate_interval])",
+          "legendFormat": "{{device}} writes_merged/s"
         }
       ],
       "title": "Disk writes",
@@ -3586,8 +3700,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -3663,12 +3777,14 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"systemMetrics.memory.SwapFree_kb\" or r[\"_field\"] == \"systemMetrics.memory.SwapTotal_kb\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\r\n  |> yield(name: \"mean\")",
+          "expr": "avg_over_time({__name__=\"ftdc_systemMetrics.memory.SwapFree_kb\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])",
+          "legendFormat": "systemMetrics.memory.SwapFree_kb",
           "refId": "A"
+        },
+        {
+          "expr": "avg_over_time({__name__=\"ftdc_systemMetrics.memory.SwapTotal_kb\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__interval])",
+          "legendFormat": "systemMetrics.memory.SwapTotal_kb",
+          "refId": "B"
         }
       ],
       "title": "Swap Memory",
@@ -3676,8 +3792,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -3754,21 +3870,19 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) =>  r._field =~ /^systemMetrics\\.disks\\..*\\.read_sectors$/ or r._field =~ /^systemMetrics\\.disks\\..*\\.read_time_ms$/  or r._field =~ /^systemMetrics\\.disks\\..*\\.reads_merged$/)\r\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\r\n  |> derivative(unit: v.windowPeriod)",
-          "refId": "A"
+          "refId": "A",
+          "expr": "deriv(label_replace({__name__=~\"ftdc_systemMetrics[.]disks[.].*[.]read_sectors\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"},\"device\",\"$1\",\"__name__\",\"ftdc_systemMetrics[.]disks[.]([^.]+)[.]read_sectors\")[$__rate_interval])",
+          "legendFormat": "{{device}} read_sectors/s"
         },
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "hide": false,
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) =>  r._field =~ /^systemMetrics\\.disks\\..*\\.io_in_progress$/ )\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n\r\n\r\n\r\n",
-          "refId": "B"
+          "refId": "B",
+          "expr": "deriv(label_replace({__name__=~\"ftdc_systemMetrics[.]disks[.].*[.]read_time_ms\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"},\"device\",\"$1\",\"__name__\",\"ftdc_systemMetrics[.]disks[.]([^.]+)[.]read_time_ms\")[$__rate_interval])",
+          "legendFormat": "{{device}} read_time_ms/s"
+        },
+        {
+          "refId": "C",
+          "expr": "deriv(label_replace({__name__=~\"ftdc_systemMetrics[.]disks[.].*[.]reads_merged\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"},\"device\",\"$1\",\"__name__\",\"ftdc_systemMetrics[.]disks[.]([^.]+)[.]reads_merged\")[$__rate_interval])",
+          "legendFormat": "{{device}} reads_merged/s"
         }
       ],
       "title": "Disk reads",
@@ -3776,8 +3890,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -3854,12 +3968,19 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"systemMetrics.netstat.Tcp:ActiveOpens\" or r[\"_field\"] == \"systemMetrics.netstat.Tcp:AttemptFails\" or r[\"_field\"] == \"systemMetrics.netstat.Tcp:EstabResets\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n  |> derivative(unit: v.windowPeriod)",
+          "expr": "deriv({__name__=\"ftdc_systemMetrics.netstat.Tcp:ActiveOpens\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "systemMetrics.netstat.Tcp:ActiveOpens",
           "refId": "A"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_systemMetrics.netstat.Tcp:AttemptFails\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "systemMetrics.netstat.Tcp:AttemptFails",
+          "refId": "B"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_systemMetrics.netstat.Tcp:EstabResets\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "systemMetrics.netstat.Tcp:EstabResets",
+          "refId": "C"
         }
       ],
       "title": "TCP ActiveOpens / AttemptFails / EstabResets",
@@ -3867,8 +3988,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -3945,12 +4066,14 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"systemMetrics.netstat.Tcp:InSegs\" or r[\"_field\"] == \"systemMetrics.netstat.Tcp:OutSegs\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n  |> derivative(unit: v.windowPeriod)",
+          "expr": "deriv({__name__=\"ftdc_systemMetrics.netstat.Tcp:InSegs\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "systemMetrics.netstat.Tcp:InSegs",
           "refId": "A"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_systemMetrics.netstat.Tcp:OutSegs\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "systemMetrics.netstat.Tcp:OutSegs",
+          "refId": "B"
         }
       ],
       "title": "TCP: InSegs / OutSegs",
@@ -3958,8 +4081,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -4036,11 +4159,8 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"systemMetrics.netstat.Ip:OutNoRoutes\" )\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n  |> derivative(unit: v.windowPeriod)",
+          "expr": "deriv({__name__=\"ftdc_systemMetrics.netstat.Ip:OutNoRoutes\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "systemMetrics.netstat.Ip:OutNoRoutes",
           "refId": "A"
         }
       ],
@@ -4049,8 +4169,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -4128,12 +4248,19 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"systemMetrics.netstat.Tcp:CurrEstab\" or r[\"_field\"] == \"systemMetrics.netstat.Tcp:EstabResets\" or r[\"_field\"] == \"systemMetrics.netstat.Tcp:OutRsts\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n  |> derivative(unit: v.windowPeriod)",
+          "expr": "deriv({__name__=\"ftdc_systemMetrics.netstat.Tcp:CurrEstab\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "systemMetrics.netstat.Tcp:CurrEstab",
           "refId": "A"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_systemMetrics.netstat.Tcp:EstabResets\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "systemMetrics.netstat.Tcp:EstabResets",
+          "refId": "B"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_systemMetrics.netstat.Tcp:OutRsts\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "systemMetrics.netstat.Tcp:OutRsts",
+          "refId": "C"
         }
       ],
       "title": "TCP Connection Issues",
@@ -4141,8 +4268,8 @@
     },
     {
       "datasource": {
-        "type": "influxdb",
-        "uid": "P3C6603E967DC8568"
+        "type": "prometheus",
+        "uid": "victoriametrics"
       },
       "fieldConfig": {
         "defaults": {
@@ -4219,12 +4346,29 @@
       },
       "targets": [
         {
-          "datasource": {
-            "type": "influxdb",
-            "uid": "P3C6603E967DC8568"
-          },
-          "query": "from(bucket: v.defaultBucket)\r\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\r\n  |> filter(fn: (r) => r[\"_measurement\"] == \"ftdc\")\r\n |> filter(fn: (r) => r[\"hostname\"] =~ /^${hostname:regex}$/)\r\n |> filter(fn: (r) => r[\"version\"] =~ /^${version:regex}$/)\r\n |> filter(fn: (r) => r[\"_field\"] == \"systemMetrics.netstat.Tcp:InCsumErrors\" \r\n                    or r[\"_field\"] == \"systemMetrics.netstat.Tcp:InErrs\"\r\n                    or r[\"_field\"] == \"systemMetrics.netstat.Tcp:RetransSegs\"\r\n                    or r[\"_field\"] == \"systemMetrics.netstat.Ip:InDiscards\"\r\n                    or r[\"_field\"] == \"systemMetrics.netstat.Ip:OutDiscards\")\r\n  |> aggregateWindow(every: v.windowPeriod, fn: last, createEmpty: false)\r\n  |> derivative(unit: v.windowPeriod)",
+          "expr": "deriv({__name__=\"ftdc_systemMetrics.netstat.Tcp:InCsumErrors\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "systemMetrics.netstat.Tcp:InCsumErrors",
           "refId": "A"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_systemMetrics.netstat.Tcp:InErrs\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "systemMetrics.netstat.Tcp:InErrs",
+          "refId": "B"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_systemMetrics.netstat.Tcp:RetransSegs\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "systemMetrics.netstat.Tcp:RetransSegs",
+          "refId": "C"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_systemMetrics.netstat.Ip:InDiscards\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "systemMetrics.netstat.Ip:InDiscards",
+          "refId": "D"
+        },
+        {
+          "expr": "deriv({__name__=\"ftdc_systemMetrics.netstat.Ip:OutDiscards\", hostname=~\"^(${hostname:pipe})$\", version=~\"^(${version:pipe})$\"}[$__rate_interval])",
+          "legendFormat": "systemMetrics.netstat.Ip:OutDiscards",
+          "refId": "E"
         }
       ],
       "title": "TCP Packet Loss or Corruption",
@@ -4238,38 +4382,48 @@
   "templating": {
     "list": [
       {
-        "allowCustomValue": false,
-        "definition": "import \"influxdata/influxdb/schema\"\n\nschema.tagValues(\n    bucket: v.bucket,\n    tag: \"hostname\"\n)",
-        "description": "",
+        "name": "hostname",
         "label": "hostname",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "victoriametrics"
+        },
+        "refresh": 2,
         "multi": true,
         "includeAll": true,
         "allValue": ".*",
-        "name": "hostname",
-        "options": [],
         "query": {
-          "query": "import \"influxdata/influxdb/schema\"\n\nschema.tagValues(\n    bucket: v.bucket,\n    tag: \"hostname\"\n)"
+          "query": "label_values({__name__=~\"ftdc_.*\"}, hostname)",
+          "refId": "StandardVariableQuery"
         },
-        "refresh": 1,
-        "regex": "",
-        "type": "query"
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": ".*"
+        }
       },
       {
-        "allowCustomValue": false,
-        "definition": "import \"influxdata/influxdb/schema\"\n\nschema.tagValues(\n    bucket: v.bucket,\n    tag: \"version\"\n)",
-        "description": "version",
+        "name": "version",
         "label": "version",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "victoriametrics"
+        },
+        "refresh": 2,
         "multi": true,
         "includeAll": true,
         "allValue": ".*",
-        "name": "version",
-        "options": [],
         "query": {
-          "query": "import \"influxdata/influxdb/schema\"\n\nschema.tagValues(\n    bucket: v.bucket,\n    tag: \"version\"\n)"
+          "query": "label_values({__name__=~\"ftdc_.*\",hostname=~\"^(${hostname:pipe})$\"}, version)",
+          "refId": "StandardVariableQuery"
         },
-        "refresh": 1,
-        "regex": "",
-        "type": "query"
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": ".*"
+        }
       }
     ]
   },

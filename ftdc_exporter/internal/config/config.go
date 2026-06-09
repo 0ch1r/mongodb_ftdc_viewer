@@ -6,22 +6,26 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/yourusername/my-ftdc-tool/internal/storage"
 )
 
 type Config struct {
 	InputDir           string
-	InfluxURL          string
-	InfluxToken        string
-	InfluxOrg          string
-	InfluxUseGZip      bool
-	InfluxBucket       string
+	Bucket             string
 	MetricsIncludeFile string
 	Parallel           int
 	BatchSize          int
 	BatchBuffer        int
 	Debug              bool
-	InfluxMeasurement  string
+	Measurement        string
 	WaitForever        bool
+	VictoriaURL        string
+	VictoriaToken      string
+	VictoriaTenant     string
+	VictoriaUsername   string
+	VictoriaPassword   string
+	VictoriaUseGZip    bool
 }
 
 // ParseFlags reads and validates CLI flags, returning a Config instance.
@@ -29,18 +33,20 @@ func ParseFlags() *Config {
 	cfg := &Config{}
 
 	flag.StringVar(&cfg.InputDir, "input-dir", "", "Path to the directory containing FTDC files (required)")
-	flag.StringVar(&cfg.InfluxURL, "influx-url", "", "InfluxDB server URL (e.g., http://localhost:8086) (required)")
-	flag.BoolVar(&cfg.InfluxUseGZip, "influx-gzip", true, "InfluxDB client gzip compression flag")
-	flag.StringVar(&cfg.InfluxToken, "influx-token", "ftdc", "InfluxDB authentication token")
-	flag.StringVar(&cfg.InfluxOrg, "influx-org", "my-org", "InfluxDB organization")
-	flag.StringVar(&cfg.InfluxMeasurement, "influx-measurement", "ftdc", "InfluxDB measurement")
-	flag.StringVar(&cfg.InfluxBucket, "influx-bucket", "my-bucket", "InfluxDB bucket name")
+	flag.StringVar(&cfg.Bucket, "bucket", "bucket", "Logical namespace/bucket tag for VictoriaMetrics writes")
+	flag.StringVar(&cfg.Measurement, "measurement", "ftdc", "Metric measurement prefix")
 	flag.IntVar(&cfg.Parallel, "parallel", 4, "Number of files to process in parallel")
 	flag.IntVar(&cfg.BatchSize, "batch-size", 1000, "Number of FTDC metrics per batch")
 	flag.IntVar(&cfg.BatchBuffer, "batch-buffer", 1, "Number of batches to queue before blocking")
 	flag.StringVar(&cfg.MetricsIncludeFile, "metrics-include-file", "", "Number of batches to queue before blocking")
 	flag.BoolVar(&cfg.Debug, "debug", false, "Enable debug logging")
 	flag.BoolVar(&cfg.WaitForever, "wait-forever", true, "Wait indefinitely")
+	flag.StringVar(&cfg.VictoriaURL, "victoria-url", "http://victoriametrics:8428", "VictoriaMetrics base URL (e.g., http://localhost:8428)")
+	flag.StringVar(&cfg.VictoriaToken, "victoria-token", "", "VictoriaMetrics token for writes")
+	flag.StringVar(&cfg.VictoriaTenant, "victoria-tenant", "", "VictoriaMetrics tenant (X-Scope-OrgID header)")
+	flag.StringVar(&cfg.VictoriaUsername, "victoria-username", "", "VictoriaMetrics basic auth username")
+	flag.StringVar(&cfg.VictoriaPassword, "victoria-password", "", "VictoriaMetrics basic auth password")
+	flag.BoolVar(&cfg.VictoriaUseGZip, "victoria-gzip", true, "Enable gzip compression for VictoriaMetrics writes")
 
 	flag.Parse()
 
@@ -56,12 +62,13 @@ func (cfg *Config) Print() {
 	fmt.Println("------------------------------------------------------------")
 	fmt.Printf("%-20s : %s\n", "Input Directory", cfg.InputDir)
 	fmt.Printf("%-20s : %s\n", "Metrics filter list", cfg.MetricsIncludeFile)
-	fmt.Printf("%-20s : %s\n", "Influx URL", cfg.InfluxURL)
-	fmt.Printf("%-20s : %t\n", "Influx Gzip", cfg.InfluxUseGZip)
-	fmt.Printf("%-20s : %s\n", "Influx Token", cfg.InfluxToken)
-	fmt.Printf("%-20s : %s\n", "Influx Org", cfg.InfluxOrg)
-	fmt.Printf("%-20s : %s\n", "Influx Bucket", cfg.InfluxBucket)
-	fmt.Printf("%-20s : %s\n", "Influx Measurement", cfg.InfluxMeasurement)
+	fmt.Printf("%-20s : %s\n", "Bucket", cfg.Bucket)
+	fmt.Printf("%-20s : %s\n", "Measurement", cfg.Measurement)
+	fmt.Printf("%-20s : %s\n", "Victoria URL", cfg.VictoriaURL)
+	fmt.Printf("%-20s : %t\n", "Victoria Gzip", cfg.VictoriaUseGZip)
+	if cfg.VictoriaTenant != "" {
+		fmt.Printf("%-20s : %s\n", "Victoria Tenant", cfg.VictoriaTenant)
+	}
 	fmt.Printf("%-20s : %d\n", "Parallel Files", cfg.Parallel)
 	fmt.Printf("%-20s : %d\n", "Batch Size", cfg.BatchSize)
 	fmt.Printf("%-20s : %d\n", "Batch Buffer", cfg.BatchBuffer)
@@ -76,11 +83,11 @@ func validateOrExit(cfg *Config) {
 	if cfg.InputDir == "" {
 		missing = append(missing, "--input-dir")
 	}
-	if cfg.InfluxURL == "" {
-		missing = append(missing, "--influx-url")
-	}
 	if cfg.MetricsIncludeFile == "" {
 		missing = append(missing, "--metrics-include-file")
+	}
+	if cfg.VictoriaURL == "" {
+		missing = append(missing, "--victoria-url")
 	}
 
 	if len(missing) > 0 {
@@ -96,4 +103,19 @@ func resolvePaths(cfg *Config) {
 		log.Fatalf("Failed to resolve input path: %v", err)
 	}
 	cfg.InputDir = absPath
+}
+
+func (cfg *Config) StorageOptions() storage.Config {
+	return storage.Config{
+		Measurement: cfg.Measurement,
+		Victoria: storage.VictoriaConfig{
+			URL:      cfg.VictoriaURL,
+			Bucket:   cfg.Bucket,
+			Tenant:   cfg.VictoriaTenant,
+			Token:    cfg.VictoriaToken,
+			Username: cfg.VictoriaUsername,
+			Password: cfg.VictoriaPassword,
+			UseGzip:  cfg.VictoriaUseGZip,
+		},
+	}
 }
