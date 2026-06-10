@@ -3,6 +3,24 @@ mongodb_ftdc_viewer is a reimagined and performance-focused evolution of zelmari
 
 It provides a fast, reliable way to process MongoDB diagnostics data and push it to **VictoriaMetrics** at high speed. Metrics can then be explored through a Docker-hosted Grafana instance.
 
+## Performance
+
+The FTDC exporter is built with a parallel pipeline engine that achieves high throughput on modern hardware:
+
+- **Parallel file processing**: Multiple FTDC files are decoded concurrently (configurable via `--parallel`, default 10).
+- **Writer pool**: A pool of HTTP connections to VictoriaMetrics allows concurrent writes without serialization bottlenecks.
+- **Batch-oriented pipeline**: FTDC metrics are streamed in configurable batches, sorted and serialized once per batch instead of per point.
+- **Zero-alloc hot paths**: String escaping, metric normalization, and line-protocol encoding use pooled builders and pre-allocated replace tables to minimize GC pressure.
+- **Single-pass include-file**: The metric filter list is parsed once at startup rather than re-read for every file.
+
+Benchmark (34 FTDC files, ~950K metrics, batch size 200, parallel 10):
+
+| Optimization stage | Wall time | Improvement |
+|---|---|---|
+| Baseline (per-file writers, per-point sorting) | ~5 min | — |
+| + Shared writer + pre-sorted fields + pooled allocs | ~3 min | −40% |
+| + Writer pool + single-pass include-file | **~1.5 min** | **−70% total** |
+
 ![Screenshoot](https://github.com/devops-land/mongodb_ftdc_viewer/blob/main/ftdc_exporter.png?raw=true)
 
 ## Prerequisites
@@ -15,11 +33,21 @@ It provides a fast, reliable way to process MongoDB diagnostics data and push it
 4. Build the docker images `docker-compose build`
 
 ## Usage
-1. Run the script`./run.sh --input-dir <DIAGNOSTICS_DATA_DIRECTORY>`
+1. Run the script `./run.sh --input-dir <DIAGNOSTICS_DATA_DIRECTORY>`
+
+The script accepts several optional flags to tune performance:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--parallel` | 10 | Number of FTDC files to process concurrently. Increase for more CPU cores. |
+| `--batch-size` | 200 | FTDC documents per batch. Larger batches reduce HTTP overhead but increase memory per batch. |
+| `--bucket` | bucket | Logical namespace tag attached to every metric. |
+| `--victoria-retention-days` | 30 | How long VictoriaMetrics retains data. |
+| `--victoria-data-directory` | /tmp/victoria_data | Host path for VictoriaMetrics persistent storage. |
 
 ***Note: you need to do those steps every time you need to read new diagnostic data files***
 
-The script will decode all the diagnostic data files (may takes some time, depending on your computer and how many metric files you want to process) and launch Docker containers:
+The script will decode all the diagnostic data files (time depends on file count, metric volume, and hardware) and launch Docker containers:
 - **ftdc_exporter**: Parses FTDC files and sends metrics to VictoriaMetrics
 - **victoriametrics**: Time-series database storing metrics
 - **grafana**: Visualization layer with pre-built dashboards

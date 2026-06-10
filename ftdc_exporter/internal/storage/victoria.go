@@ -12,10 +12,27 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
+var (
+	measurementReplacer = strings.NewReplacer(",", "\\,", " ", "\\ ")
+	tagComponentReplacer = strings.NewReplacer(",", "\\,", " ", "\\ ", "=", "\\=")
+	fieldKeyReplacer    = strings.NewReplacer(",", "\\,", " ", "\\ ")
+	fieldStringReplacer = strings.NewReplacer("\\", "\\\\", "\"", "\\\"")
+)
+
+var builderPool = sync.Pool{
+	New: func() any { return new(strings.Builder) },
+}
+
+var bufPool = sync.Pool{
+	New: func() any { return new(bytes.Buffer) },
+}
+
 type victoriaWriter struct {
+	mu          sync.Mutex
 	client      *http.Client
 	endpoint    string
 	measurement string
@@ -52,16 +69,33 @@ func newVictoriaWriter(measurement string, cfg VictoriaConfig) (Writer, error) {
 }
 
 func (w *victoriaWriter) Write(ctx context.Context, tags map[string]string, points []Point) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
 	if len(points) == 0 {
 		return nil
 	}
 
-	var builder strings.Builder
+	// Pre-sort tag keys once per batch (same tags for all points).
+	tagKeys := make([]string, 0, len(tags))
+	for key := range tags {
+		tagKeys = append(tagKeys, key)
+	}
+	sort.Strings(tagKeys)
+
+	// Pre-sort field keys from the first point (all points share the same FTDC schema).
+	// If subsequent points have more keys we fall back to per-point sorting.
+	fieldKeys := preSortedFieldKeys(points)
+
+	builder := builderPool.Get().(*strings.Builder)
+	builder.Reset()
+	defer builderPool.Put(builder)
+
 	for i, p := range points {
 		if i > 0 {
 			builder.WriteByte('\n')
 		}
-		line, err := pointToLine(w.measurement, tags, p)
+		line, err := pointToLine(w.measurement, tags, tagKeys, fieldKeys, p)
 		if err != nil {
 			return err
 		}
@@ -73,15 +107,17 @@ func (w *victoriaWriter) Write(ctx context.Context, tags map[string]string, poin
 	headers := make(map[string]string)
 
 	if w.useGzip {
-		var buf bytes.Buffer
-		gz := gzip.NewWriter(&buf)
+		buf := bufPool.Get().(*bytes.Buffer)
+		buf.Reset()
+		defer bufPool.Put(buf)
+		gz := gzip.NewWriter(buf)
 		if _, err := gz.Write(payload); err != nil {
 			return err
 		}
 		if err := gz.Close(); err != nil {
 			return err
 		}
-		bodyReader = &buf
+		bodyReader = buf
 		headers["Content-Encoding"] = "gzip"
 	}
 
@@ -131,32 +167,22 @@ func (w *victoriaWriter) buildURL() string {
 	return fmt.Sprintf("%s?%s", w.endpoint, params.Encode())
 }
 
-func pointToLine(measurement string, tags map[string]string, p Point) (string, error) {
+func pointToLine(measurement string, tags map[string]string, tagKeys []string, fieldKeys []string, p Point) (string, error) {
 	if strings.TrimSpace(measurement) == "" {
 		return "", fmt.Errorf("measurement must be provided")
 	}
-	var builder strings.Builder
-	builder.WriteString(escapeMeasurement(measurement))
 
-	if len(tags) > 0 {
-		tagKeys := make([]string, 0, len(tags))
-		for key := range tags {
-			tagKeys = append(tagKeys, key)
-		}
-		sort.Strings(tagKeys)
-		for _, key := range tagKeys {
-			builder.WriteByte(',')
-			builder.WriteString(escapeTagComponent(key))
-			builder.WriteByte('=')
-			builder.WriteString(escapeTagComponent(tags[key]))
-		}
-	}
+	// Use a pooled builder inside pointToLine for the line itself.
+	// Note: this builder is separate from the batch-level builder in Write().
+	var inner strings.Builder
+	inner.WriteString(escapeMeasurement(measurement))
 
-	fieldKeys := make([]string, 0, len(p.Fields))
-	for key := range p.Fields {
-		fieldKeys = append(fieldKeys, key)
+	for _, key := range tagKeys {
+		inner.WriteByte(',')
+		inner.WriteString(escapeTagComponent(key))
+		inner.WriteByte('=')
+		inner.WriteString(escapeTagComponent(tags[key]))
 	}
-	sort.Strings(fieldKeys)
 
 	fieldCount := 0
 	for _, key := range fieldKeys {
@@ -165,13 +191,13 @@ func pointToLine(measurement string, tags map[string]string, p Point) (string, e
 			continue
 		}
 		if fieldCount == 0 {
-			builder.WriteByte(' ')
+			inner.WriteByte(' ')
 		} else {
-			builder.WriteByte(',')
+			inner.WriteByte(',')
 		}
-		builder.WriteString(escapeFieldKey(key))
-		builder.WriteByte('=')
-		builder.WriteString(value)
+		inner.WriteString(escapeFieldKey(key))
+		inner.WriteByte('=')
+		inner.WriteString(value)
 		fieldCount++
 	}
 
@@ -179,9 +205,23 @@ func pointToLine(measurement string, tags map[string]string, p Point) (string, e
 		return "", fmt.Errorf("point has no encodable fields")
 	}
 
-	builder.WriteByte(' ')
-	builder.WriteString(strconv.FormatInt(p.Timestamp.UnixNano(), 10))
-	return builder.String(), nil
+	inner.WriteByte(' ')
+	inner.WriteString(strconv.FormatInt(p.Timestamp.UnixNano(), 10))
+	return inner.String(), nil
+}
+
+// preSortedFieldKeys extracts and sorts field keys from the first point.
+// All points in an FTDC batch share the same schema.
+func preSortedFieldKeys(points []Point) []string {
+	if len(points) == 0 || len(points[0].Fields) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(points[0].Fields))
+	for key := range points[0].Fields {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func toLineProtocolValue(v interface{}) (string, bool) {
@@ -233,22 +273,17 @@ func toLineProtocolValue(v interface{}) (string, bool) {
 }
 
 func escapeMeasurement(value string) string {
-	replacer := strings.NewReplacer(",", "\\,", " ", "\\ ")
-	return replacer.Replace(value)
+	return measurementReplacer.Replace(value)
 }
 
 func escapeTagComponent(value string) string {
-	replacer := strings.NewReplacer(",", "\\,", " ", "\\ ", "=", "\\=")
-	return replacer.Replace(value)
+	return tagComponentReplacer.Replace(value)
 }
 
 func escapeFieldKey(value string) string {
-	replacer := strings.NewReplacer(",", "\\,", " ", "\\ ")
-	return replacer.Replace(value)
+	return fieldKeyReplacer.Replace(value)
 }
 
 func quoteFieldString(value string) string {
-	escaped := strings.ReplaceAll(value, "\\", "\\\\")
-	escaped = strings.ReplaceAll(escaped, "\"", "\\\"")
-	return "\"" + escaped + "\""
+	return "\"" + fieldStringReplacer.Replace(value) + "\""
 }

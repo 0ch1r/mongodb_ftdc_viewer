@@ -17,6 +17,11 @@ func BenchmarkStreamFTDCMetricsInBatches(b *testing.B) {
 	}
 	fileSize := fi.Size()
 
+	includePatterns, err := ParseIncludeFile(includeFile)
+	if err != nil {
+		b.Fatalf("parse include file: %v", err)
+	}
+
 	cases := []struct {
 		name       string
 		batchSize  int
@@ -34,7 +39,7 @@ func BenchmarkStreamFTDCMetricsInBatches(b *testing.B) {
 
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				batches, _ := streamFTDCMetricsInBatches(b.Context(), path, includeFile, tc.batchSize, tc.bufferSize)
+				batches, _ := streamFTDCMetricsInBatches(b.Context(), path, includePatterns, tc.batchSize, tc.bufferSize)
 
 				count := 0
 				for range batches {

@@ -1,13 +1,38 @@
 package ftdc
 
 import (
+	"bufio"
 	"context"
+	"fmt"
+	"os"
 	"strings"
 )
 
+// ParseIncludeFile reads a metrics-include file into a set of patterns.
+func ParseIncludeFile(path string) (map[string]struct{}, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("open include file: %w", err)
+	}
+	defer f.Close()
+
+	patterns := make(map[string]struct{})
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line != "" {
+			patterns[line] = struct{}{}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scan include file: %w", err)
+	}
+	return patterns, nil
+}
+
 // StreamBatches is a public wrapper to stream ftdc metrics
-func StreamBatches(ctx context.Context, path string, metricsIncludeFilePath string, batchSize, buffer int) (<-chan StreamBatch, <-chan error) {
-	return streamFTDCMetricsInBatches(ctx, path, metricsIncludeFilePath, batchSize, buffer)
+func StreamBatches(ctx context.Context, path string, includePatterns map[string]struct{}, batchSize, buffer int) (<-chan StreamBatch, <-chan error) {
+	return streamFTDCMetricsInBatches(ctx, path, includePatterns, batchSize, buffer)
 }
 
 func ReadMetadata(ctx context.Context, path string) (map[string]interface{}, error) {
