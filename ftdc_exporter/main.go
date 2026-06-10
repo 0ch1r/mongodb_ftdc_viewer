@@ -80,20 +80,13 @@ func buildGrafanaURL(bounds *timeBounds) (string, error) {
 	return fmt.Sprintf("%s?from=%s&to=%s&timezone=UTC", grafanaDashboardURL, from, to), nil
 }
 
-func ingestFTDCFromFile(absInputPath string, cfg *config.Config, counter *atomic.Int64, bounds *timeBounds) error {
-	ctx := context.Background()
-	writer, err := storage.NewWriter(ctx, cfg.StorageOptions())
-	if err != nil {
-		return err
-	}
-	defer writer.Close()
-
+func ingestFTDCFromFile(ctx context.Context, absInputPath string, writer storage.Writer, cfg *config.Config, counter *atomic.Int64, bounds *timeBounds, includePatterns map[string]struct{}) error {
 	tags, err := ftdc.GetTags(ctx, absInputPath)
 	if err != nil {
 		return err
 	}
 
-	batches, errs := ftdc.StreamBatches(ctx, absInputPath, cfg.MetricsIncludeFile, cfg.BatchSize, cfg.BatchBuffer)
+	batches, errs := ftdc.StreamBatches(ctx, absInputPath, includePatterns, cfg.BatchSize, cfg.BatchBuffer)
 	if cfg.Debug {
 		logging.Info("Processing: %s", absInputPath)
 	}
@@ -184,8 +177,26 @@ func main() {
 		log.Fatal(err)
 	}
 
+	includePatterns, err := ftdc.ParseIncludeFile(cfg.MetricsIncludeFile)
+	if err != nil {
+		log.Fatalf("Failed to parse metrics include file: %v", err)
+	}
+
 	g, ctx := errgroup.WithContext(context.Background())
 	g.SetLimit(cfg.Parallel)
+
+	writerPool := make([]storage.Writer, cfg.Parallel)
+	for i := range writerPool {
+		w, err := storage.NewWriter(ctx, cfg.StorageOptions())
+		if err != nil {
+			log.Fatalf("Failed to create metrics writer: %v", err)
+		}
+		defer w.Close()
+		writerPool[i] = w
+	}
+
+	var writerIdx atomic.Int64
+
 	sort.Strings(files)
 
 	logging.Info("%d files queued for processing", len(files))
@@ -196,7 +207,8 @@ func main() {
 			case <-ctx.Done():
 				return ctx.Err()
 			default:
-				if err := ingestFTDCFromFile(filepath.Clean(file), cfg, &processed, bounds); err != nil {
+				idx := int(writerIdx.Add(1)-1) % len(writerPool)
+				if err := ingestFTDCFromFile(ctx, filepath.Clean(file), writerPool[idx], cfg, &processed, bounds, includePatterns); err != nil {
 					if errors.Is(err, ftdc.ErrInvalidFormat) {
 						logging.Info("failed to ingest file %s: %v", file, err)
 						return nil
